@@ -12,7 +12,9 @@ on:
   workflow_call:
 
 env:
-  GO_VERSION: 1.19
+  # Version of Go to be used for builds
+  GO_VERSION: '>=1.19'
+  # Base directory in which to perform checkout, build and tests
   BASE_DIRECTORY: ./reg-room-service
 
 jobs:
@@ -27,11 +29,12 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+          check-latest: true
 
       - name: Build
-        run: go build -v ./...
         working-directory: ${{ env.BASE_DIRECTORY }}
+        run: go build -v ./...
 
       - name: Test
-        run: go test -v ./...
         working-directory: ${{ env.BASE_DIRECTORY }}
+        run: go test -v ./...
