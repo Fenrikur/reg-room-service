@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    #branches:
+    #  - main
+    tags:
+      - 'v*.*.*'
+
+env:
+  # Version of Go to be used for builds
+  GO_VERSION: '>=1.19'
+  # Base name used for release archives (pattern: $basename.$os.$architecture.$archive-type)
+  ARCHIVE_BASE_NAME: reg-room-service
+  # Additional files apart from the Go binary that should be bundled in the release archives
+  ADDITIONAL_ARTIFACTS: README.md LICENSE docs/config-template.yaml api/openapi-spec/openapi.yaml
+
+jobs:
+  call_build_and_test:
+    uses: ./.github/workflows/go.yml
+
+  # Build artifacts for all major OSs and architectures and upload
+  # them to the workflow's artifact storage.
+  matrix_build_upload:
+    permissions:
+      contents: write
+    needs: call_build_and_test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ linux, windows, darwin ]
+        arch: [ 386, amd64, arm64 ]
+        exclude:
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: arm64
+          - os: darwin
+            arch: 386
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: mkdir -p target; go build -o target -ldflags="-w -s" -v -x ./...
+
+      # Main executable of the service must be named 'cmd' or 'cmd.exe' by convention
+      - name: Prepare release archive
+        run: |-
+          mkdir release
+          chmod u=rwX,go=rX target/cmd* || echo "Service executable seems to be missing?"
+          cp -p target/* ${{ env.ADDITIONAL_ARTIFACTS }} release/
+          chmod u=rwX,go=rX release/*.sh 2>/dev/null || echo "No .sh files to set permissions on, continuing..."
+          ls -alR release
+
+      - name: Create release archive (tar.gz; except Windows)
+        if: ${{ matrix.os != 'windows' }}
+        working-directory: release
+        run: |-
+          tar -cvzf ../${{ env.ARCHIVE_BASE_NAME }}.${{ matrix.os }}-${{ matrix.arch }}.tar.gz .
+          tar -tf ../${{ env.ARCHIVE_BASE_NAME }}.${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+
+      - name: Create release archive (zip; Windows only)
+        if: ${{ matrix.os == 'windows' }}
+        working-directory: release
+        run: |-
+          zip -vr ../${{ env.ARCHIVE_BASE_NAME }}.${{ matrix.os }}-${{ matrix.arch }}.zip .
+          unzip -l ../${{ env.ARCHIVE_BASE_NAME }}.${{ matrix.os }}-${{ matrix.arch }}.zip
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v3
+        with:
+          path: ${{ env.ARCHIVE_BASE_NAME }}.${{ matrix.os }}-${{ matrix.arch }}.*
+          if-no-files-found: warn
+
+  # Only create a release when the event triggering the workflow references a tag.
+  create_release:
+    if: startsWith(github.event.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    needs: matrix_build_upload
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v3
+        id: download
+        with:
+          path: release-artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ${{ steps.download.outputs.download-path }}/**
