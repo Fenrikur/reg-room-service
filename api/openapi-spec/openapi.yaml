@@ -1,0 +1,59 @@
+openapi: 3.1.0
+info:
+  title: Eurofurence Reg Room Service
+  description:
+    This service provides the secret booking codes for hotel room booking.
+    The codes are only revealed after the specified launch dates. A valid JWT is required
+    to authenticate as a staff member.
+  contact:
+    email: jsquirrel_github_9a6d@packetloss.de
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  version: 1.0.0
+externalDocs:
+  description: GitHub repository, including README
+  url: https://github.com/eurofurence/reg-room-service
+servers:
+  - url: https://reglive.eurofurence.org/api/room-service
+paths:
+  /countdown:
+    get:
+      summary: Room registration launch information
+      description: Returns seconds until launch or the room booking secret.
+      operationId: getCountdown
+      parameters:
+        - name: currentTimeIso
+          in: query
+          description: Specify alternate value for 'now' for testing purposes.
+          schema:
+            type: string
+      responses:
+        200:
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountdownResponse"
+        403:
+          description: unauthorized
+          content: {}
+components:
+  schemas:
+    CountdownResponse:
+      type: object
+      properties:
+        currentTime:
+          type: string
+          description: The service's understanding of 'now' in ISO-8601-1 format.
+        targetTime:
+          type: string
+          description:
+            The specified launch date in ISO-8601-1 time format. Staff
+            members will see a different targetTime until the public launch date has
+            arrived.
+        countdown:
+          type: integer
+          format: int64
+        secret:
+          type: string
