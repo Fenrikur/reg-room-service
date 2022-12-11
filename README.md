@@ -1,5 +1,9 @@
 # reg-room-service
 
+[![Go](../../actions/workflows/go.yml/badge.svg)](../../actions/workflows/go.yml)
+[![CodeQL](../../actions/workflows/codeql-analysis.yml/badge.svg)](../../actions/workflows/codeql-analysis.yml)
+[![Release](../../actions/workflows/release.yml/badge.svg)](../../actions/workflows/release.yml)
+
 ## Overview
 
 A backend service that provides room management.
